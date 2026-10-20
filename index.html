@@ -601,6 +601,14 @@ body::after{
 .cv-body{ flex: 1; min-height: 0; display: flex }
 .cv-body .jam-bars-wrap{ flex: 1; max-height: none; min-height: 0; border: 0; padding: 0; --jb-cell: 210px }
 .cv-body .jam-bars-wrap.dense{ --jb-cell: 150px }
+/* v0.0.24: in the cards view every tile is one fixed square (--cv-cell,
+   worked out in _renderBars from the window width), and each tile sizes
+   its own chord and notes to fill it. The index stays 20px. */
+.cv-body .jam-bars{ grid-template-columns: repeat(auto-fill, var(--cv-cell, 210px)); grid-auto-rows: var(--cv-cell, 210px); justify-content: center }
+.cv-body .jam-bar{ width: var(--cv-cell, 210px); height: var(--cv-cell, 210px); aspect-ratio: auto }
+/* fixed line boxes: the index, chord and notes sit at the same height in every tile */
+.cv-body .jam-bar .jb-c{ font-size: var(--cv-c, var(--jb-text, 90px)); height: var(--cv-ch, auto); line-height: var(--cv-ch, 1.05) }
+.cv-body .jam-bar .jb-p{ font-size: var(--cv-p, var(--jb-pitch, 20px)); height: var(--cv-ph, auto); line-height: var(--cv-ph, 1) }
 /* nothing under the cards is painted while they are up */
 body.cards-only .topbar, body.cards-only #workspace{ visibility: hidden }
 
@@ -623,6 +631,21 @@ body.cards-only .topbar, body.cards-only #workspace{ visibility: hidden }
 }
 .cb-gap{ flex: 1 }
 #cbModeNotes, #cbModeDeg{ text-transform: none; letter-spacing: .08em }   /* Am ≠ AM */
+/* v0.0.26: chord names toggle — Cm (letters) / 1m (degrees of the key) */
+.names-tog{ display: inline-flex; gap: 0 }
+.names-tog .btn{ text-transform: none; letter-spacing: .08em; min-width: 3.2em }
+.names-tog .btn + .btn{ border-left-width: 0 }
+/* v0.0.27: card size (preset menu + double-click the number) and auto-scroll */
+.zoom-ctl{ display: inline-flex; align-items: stretch }
+.zoom-ctl .zoom-num{
+  width: 5.2em; text-align: center; cursor: default;
+  background: var(--bg); color: var(--ink);
+  border: 1px solid var(--line-soft); border-right-width: 0; border-radius: 0;
+  font-family: var(--font-tech); font-size: 11px; letter-spacing: .1em; padding: 0 4px;
+}
+.zoom-ctl .zoom-num:not([readonly]){ border-color: var(--ink); border-right-width: 1px; cursor: text }
+.zoom-ctl .zoom-pick{ width: 26px; padding: 4px 0; color: transparent; border-radius: 0 }
+.zoom-ctl .zoom-pick option{ color: var(--ink); background: var(--bg) }
 .cb-lab, .cb-count{ font-size: 10px; letter-spacing: .14em; color: var(--ink-faint); text-transform: uppercase }
 .cb-sec{
   font-size: 10px; letter-spacing: .2em; text-transform: uppercase; color: var(--ink-dim);
@@ -819,6 +842,24 @@ body.cards-only .topbar, body.cards-only #workspace{ visibility: hidden }
 /* the index and the notes stay subordinate inside the inverted tile */
 .jam-bar.playing .jb-n{ color: color-mix(in srgb, var(--bg) 80%, var(--ink)) }
 .jam-bar.playing .jb-p{ color: color-mix(in srgb, var(--bg) 80%, var(--ink)) }
+.jam-bar{ cursor: default }
+/* v0.0.25: double-click a card to rewrite its chord in place */
+.jam-bar .jb-edit{
+  display: block; width: 100%; min-width: 0; box-sizing: border-box;
+  background: var(--bg); color: var(--ink);
+  border: 1px solid var(--ink); outline: none; border-radius: 0;
+  font-family: var(--font-tech); text-align: center;
+  font-size: max(18px, calc(var(--cv-c, var(--jb-text, 90px)) * .6));
+  line-height: 1.2; padding: 2px 4px;
+}
+/* v0.0.28: with auto-scroll on, the empty end of the last row is filled
+   with the start of the form again (it loops), dimmed and dashed */
+/* v0.0.32: only the time round that is playing is bright; the cards of
+   the time before and the time after are dimmed and dashed */
+.jam-bar.dim{ opacity: .45; border-style: dashed }
+.jam-bar.dim.playing{ opacity: 1; border-style: solid }
+.jam-bar .jb-edit.err{ border-color: #ff5a4a; color: #ff5a4a }
+.jam-bar.editing{ border-color: var(--ink) }
 .jam-bars-empty{
   grid-column: 1 / -1;
   font-family: var(--font-tech);
@@ -2159,6 +2200,7 @@ body.veil-gone .veil{ opacity:0; pointer-events:none }
         <button class="btn" id="btnMetronome" title="metronome">metro</button>
         <button class="btn" id="btnClearTimeline" title="clear all recorded notes">clear</button>
         <button class="btn" id="btnCards" title="chord cards only — hide every panel and stop the meters (Esc to come back)">▦ cards</button>
+        <span class="names-tog" title="chord names on the cards: letters (Cm) or degrees of the key (1m)"><button class="btn" data-names="notes">Cm</button><button class="btn" data-names="deg">1m</button></span>
         <span class="t-divider"></span>
         <span class="bpm-label">bpm</span>
         <input class="bpm-display" id="bpmInput" type="number" value="120" min="40" max="240" step="any" readonly title="double-click to edit BPM" />
@@ -2199,6 +2241,10 @@ body.veil-gone .veil{ opacity:0; pointer-events:none }
         <div class="jam-row">
           <span class="jam-label">style</span>
           <select class="jam-pick wide" id="jamStyle" title="groove / feel of the backing band"></select>
+          <span class="jam-sep"></span>
+          <span class="jam-label">cards</span>
+          <button class="btn tiny" data-autoscroll title="auto-scroll: keep the playing card in view">⇣ scroll</button>
+          <span class="zoom-ctl" title="card size · pick a size, or double-click the number and type one (40-300 %)"><input class="zoom-num" data-zoom type="text" value="100 %" readonly><select class="zoom-pick" data-zoom-pick aria-label="card size"><option value="">▾</option><option value="50">50 %</option><option value="75">75 %</option><option value="100">100 %</option><option value="125">125 %</option><option value="150">150 %</option><option value="200">200 %</option><option value="250">250 %</option></select></span>
           <span class="jam-sep"></span>
           <span class="jam-label">loop</span>
           <button class="btn tiny" id="jamSyncLoop" title="match the master loop length in [01] to this progression">sync bars</button>
@@ -2622,6 +2668,9 @@ body.veil-gone .veil{ opacity:0; pointer-events:none }
   <div class="cv-bar">
     <button class="btn primary" id="cvPlay">▶ play</button>
     <button class="btn" id="cvStop">■ stop</button>
+    <span class="names-tog" title="chord names on the cards: letters (Cm) or degrees of the key (1m)"><button class="btn" data-names="notes">Cm</button><button class="btn" data-names="deg">1m</button></span>
+    <button class="btn" data-autoscroll title="auto-scroll: keep the playing card in view">⇣ scroll</button>
+    <span class="zoom-ctl" title="card size · pick a size, or double-click the number and type one (40-300 %)"><input class="zoom-num" data-zoom type="text" value="100 %" readonly><select class="zoom-pick" data-zoom-pick aria-label="card size"><option value="">▾</option><option value="50">50 %</option><option value="75">75 %</option><option value="100">100 %</option><option value="125">125 %</option><option value="150">150 %</option><option value="200">200 %</option><option value="250">250 %</option></select></span>
     <span class="cv-info" id="cvInfo"></span>
     <span class="cb-gap"></span>
     <button class="btn" id="cvExit" title="back to the panels (Esc)">✕ panels</button>
@@ -2845,7 +2894,7 @@ body.veil-gone .veil{ opacity:0; pointer-events:none }
    outside this block and the changelog.
    ========================================================= */
 const APP = {
-  version: '0.0.23',
+  version: '0.0.32',
   edition: 'lite',
   name: 'PROJECT-BAND-LITE',
   tagline: 'browser jam workstation',
@@ -7471,7 +7520,7 @@ const Jam = (() => {
     const t = TEMPLATES.find(x => x.id === (tSel && tSel.value));
     const b = t && _beats(t);
     const prev = S.refT;
-    S.refT = (t && b && t.prog === raw && (b.length - 1) * 4 === totalSteps()) ? t : null;
+    S.refT = (t && b && (t.prog === raw || _cardKept(t, raw)) && (b.length - 1) * 4 === totalSteps()) ? t : null;
     if (S.refT !== prev) Ref.userOff = false;      // a new song starts on its map
     if (S.refT !== prev){
       _refStop();
@@ -7756,7 +7805,8 @@ const Jam = (() => {
     ['m(Maj7)','Min(Maj7)','mmaj7'], ['dim7','Diminished 7th','dim7'], ['aug7','Augmented 7th','aug7'], ['augMaj7','Aug(Maj7)','augmaj7'],
   ];
   const CB = { root: 0, mode: 'notes', join: false, pos: null };   // pos: where the user dragged it
-  try { const m = localStorage.getItem('bandlite.cb.mode'); if (m === 'deg' || m === 'notes') CB.mode = m; } catch (_){}
+  /* v0.0.26: names start as letters (Cm) on every load; the toggle in
+     [01], in ▦ cards and the builder's "write as" all switch the same state */
   const _cbEl = id => document.getElementById(id);
   function _cbKeyPc(){
     const k = _cbEl('jamKey'); return (k && NOTE_PC[k.value.toUpperCase()]) || 0;
@@ -7886,10 +7936,13 @@ const Jam = (() => {
       _cbInsert(_cbToken(CB_TYPES[+b.dataset.i][2]));
     });
     const mode = m => {
-      CB.mode = m; try { localStorage.setItem('bandlite.cb.mode', m); } catch (_){}
+      CB.mode = m;
       _cbRender();
+      document.querySelectorAll('[data-names]').forEach(b => b.classList.toggle('active', b.dataset.names === m));
       if (S.bars.length){ _renderBars(); if (S.lastBarShown >= 0) _lightBar(S.lastBarShown); }
     };
+    document.querySelectorAll('[data-names]').forEach(b => b.addEventListener('click', () => mode(b.dataset.names)));
+    document.querySelectorAll('[data-names]').forEach(b => b.classList.toggle('active', b.dataset.names === CB.mode));
     _cbEl('cbModeNotes').addEventListener('click', () => mode('notes'));
     _cbEl('cbModeDeg').addEventListener('click', () => mode('deg'));
     _cbEl('cbJoin').addEventListener('click', () => { CB.join = !CB.join; _cbRender(); });
@@ -9578,19 +9631,33 @@ const Jam = (() => {
   function _lightBar(bar){
     const wrap = document.getElementById('jamBars');
     if (!wrap) return;
+    const prev = wrap.querySelector('.jam-bar.playing');
     wrap.querySelectorAll('.jam-bar.playing').forEach(e => e.classList.remove('playing'));
-    const el = wrap.children[bar];
+    /* v0.0.30: with auto-scroll on the strip is a tape. The light moves
+       to the NEXT card when that card is the bar being played, so at the
+       end of the song it steps onto the loop card after it (bar 1 of the
+       next time round) instead of jumping back to the top. */
+    let el = null;
+    if (S.autoScroll !== false && prev && prev.parentNode === wrap){
+      const nx = prev.nextElementSibling;
+      if (_barOf(prev) === bar) el = prev;
+      else if (nx && _barOf(nx) === bar) el = nx;
+    }
+    if (!el) el = wrap.children[bar];
     if (el && el.classList){
       el.classList.add('playing');
+      if (el.classList.contains('loop')) _loopAhead(el);
+      _passMark(_passOf(el));
       // On a long form the current bar can be scrolled out of the strip.
       // Only nudge when it actually is — scrollIntoView on every bar makes
       // the whole panel twitch once per bar.
       const box = wrap.parentElement;
-      if (box && box.scrollHeight > box.clientHeight + 2){
-        const top = el.offsetTop - box.offsetTop;
-        if (top < box.scrollTop || top + el.offsetHeight > box.scrollTop + box.clientHeight){
-          box.scrollTop = Math.max(0, top - box.clientHeight / 2 + el.offsetHeight / 2);
-        }
+      if (S.autoScroll !== false && box){
+        /* v0.0.29: the row being played is always the FIRST row in view;
+           the loop cards below it show what comes next */
+        const pad = parseFloat(getComputedStyle(box).paddingTop) || 0;
+        const top = box.scrollTop + el.getBoundingClientRect().top - box.getBoundingClientRect().top - pad;
+        if (Math.abs(top - box.scrollTop) > 1) box.scrollTo({ top: Math.max(0, top), behavior: 'smooth' });
       }
     }
   }
@@ -9598,6 +9665,7 @@ const Jam = (() => {
   function _clearBarLight(){
     const wrap = document.getElementById('jamBars');
     if (wrap) wrap.querySelectorAll('.jam-bar.playing').forEach(e => e.classList.remove('playing'));
+    _passMark(0);
     S.lastBarShown = -1;
     _clearStepLight();
   }
@@ -9929,6 +9997,220 @@ const Jam = (() => {
     if (!S.drumGrid) _gridFromStyle();
   }
 
+  /* =========================================================
+     EDIT A CARD (v0.0.25) — double-click a chord card, type a new
+     chord (or two, "C G", up to four), Enter. The field, the cards and
+     the band all change at once: the bar's slot is rewritten in the
+     progression field, in the field's own notation (letters stay
+     letters, degrees stay degrees, so a key change still transposes
+     it), the progression is re-read, and the band picks the new chord
+     up on its next step without stopping or losing its place. A song
+     template keeps its recording and beat map: the bar count cannot
+     change from a card. Esc cancels; an unreadable chord stays in the
+     box, in red, until it is fixed or cancelled.
+     ========================================================= */
+  S.cardEdit = null;               // { id, n }: a song template edited card by card
+  function _cardKept(t, raw){
+    return !!(S.cardEdit && t && S.cardEdit.id === t.id && _slots(raw).length === _slots(t.prog).length);
+  }
+  const _degTok = tok => /^[b#\u266D\u266F]?([1-7]|[ivIV])/.test(tok);
+  function _tokFor(c, deg){
+    if (deg){
+      const kp = S.keyPc || 0, dn = CB_DEG[(c.root - kp + 12) % 12];
+      let q = c.q || '';
+      if (q === '' && dn.length === 1 && DIATONIC_Q[+dn] !== '') q = 'M';
+      return dn + q + (c.bass !== c.root ? '/' + CB_DEG[(c.bass - kp + 12) % 12] : '');
+    }
+    return c.name + (c.bass !== c.root ? '/' + _pcName(c.bass, c.spell) : '');
+  }
+  /* rewrite slot i of the raw field text, keeping its separators */
+  function _withSlot(raw, i, text){
+    const s = String(raw || '');
+    if (/[-,|]/.test(s)){
+      const parts = s.split(/([-,|])/);
+      let k = -1;
+      for (let j = 0; j < parts.length; j += 2){
+        if (!parts[j].trim()) continue;
+        if (++k === i){
+          const m = parts[j].match(/^(\s*)[\s\S]*?(\s*)$/);
+          parts[j] = m[1] + text + m[2];
+          return parts.join('');
+        }
+      }
+      return null;
+    }
+    const sl = _slots(s); if (i >= sl.length) return null;
+    sl[i] = [text];
+    return sl.map(x => x.join(' ')).join('-');
+  }
+  function _cardCommit(i, text){
+    const toks = String(text).trim().split(/\s+/).filter(Boolean);
+    if (!toks.length) return 'type a chord';
+    if (toks.length > 4) return 'max 4 chords per bar';
+    const bluesy = /blues/.test(S.style);
+    const chords = [];
+    for (const tok of toks){
+      const c = _chord(tok, S.keyPc, bluesy);
+      if (!c || c === 'REPEAT') return `can't read "${tok}"`;
+      chords.push(c);
+    }
+    const inp = document.getElementById('jamInput');
+    const sl = _slots(inp.value);
+    if (i >= sl.length) return 'the field changed — apply it first';
+    /* write it the way that slot was written */
+    const deg = _degTok(sl[i][0]);
+    const out = toks.map((tok, j) => _degTok(tok) === deg ? tok : _tokFor(chords[j], deg)).join(' ');
+    const raw = _withSlot(inp.value, i, out);
+    if (raw === null) return 'the field changed — apply it first';
+    let bars;
+    try { bars = parse(raw, S.keyPc, bluesy); } catch (err){ return err.message; }
+    if (bars.length !== S.bars.length) return 'a card cannot add or remove bars';
+    /* a song template stays the song: same bars, same recording */
+    const tSel = document.getElementById('jamTemplate');
+    const t = TEMPLATES.find(x => x.id === (tSel && tSel.value));
+    if (t && t.id && (t.prog === inp.value || _cardKept(t, inp.value))) S.cardEdit = { id: t.id };
+    inp.value = raw;
+    S.bars = bars; S.raw = raw;
+    S.lastVoicing = null;          // voice the new chord from scratch
+    const shown = S.lastBarShown;
+    _renderBars();
+    if (shown >= 0) _lightBar(shown);
+    _hint(DEFAULT_HINT, false);
+    if (typeof flashLog === 'function') flashLog(`bar ${i + 1} → ${bars[i].map(c => c.name).join(' ')}`);
+    return null;
+  }
+  function _cardEdit(card){
+    const wrap = document.getElementById('jamBars');
+    const i = card.classList.contains('loop') ? +card.dataset.of : [...wrap.children].indexOf(card);
+    if (i < 0 || !S.bars[i] || card.classList.contains('editing')) return;
+    const cEl = card.querySelector('.jb-c'); if (!cEl) return;
+    card.classList.add('editing');
+    const was = cEl.textContent;
+    const box = document.createElement('input');
+    box.className = 'jb-edit'; box.type = 'text'; box.spellcheck = false;
+    box.value = was; box.title = 'Enter = change · Esc = cancel';
+    cEl.textContent = ''; cEl.appendChild(box);
+    box.focus(); box.select();
+    let done = false;
+    const end = (commit, blurred) => {
+      if (done) return;
+      if (commit && box.value.trim() !== was){
+        const err = _cardCommit(i, box.value);
+        if (err && !blurred){ box.classList.add('err'); box.title = '⚠ ' + err; _hint('⚠ bar ' + (i + 1) + ': ' + err, true); box.focus(); return; }
+        if (err){ _hint('⚠ bar ' + (i + 1) + ': ' + err + ' — not changed', true); commit = false; }
+        else { done = true; return; }   // _renderBars() replaced the card
+      }
+      done = true;
+      card.classList.remove('editing');
+      if (box.parentNode === cEl) cEl.textContent = was;
+      if (!blurred) _hint(DEFAULT_HINT, false);
+    };
+    box.addEventListener('keydown', e => {
+      e.stopPropagation();         // not the keyboard synth, not Esc-closes-cards
+      if (e.key === 'Enter'){ e.preventDefault(); end(true); }
+      else if (e.key === 'Escape'){ e.preventDefault(); end(false); }
+    });
+    box.addEventListener('input', () => box.classList.remove('err'));
+    box.addEventListener('blur', () => setTimeout(() => { if (!done) end(true, true); }, 0));
+    box.addEventListener('dblclick', e => e.stopPropagation());
+  }
+
+  /* v0.0.28 · LOOP FILL. With auto-scroll on, the cells left empty at the
+     end of the last row show what comes next: the form starts again from
+     bar 1. They are copies (dimmed, dashed), light up with the bar they
+     repeat, and a double-click on one edits that bar. Refilled when the
+     strip changes width. */
+  function _fillLoop(){
+    const wrap = document.getElementById('jamBars');
+    if (!wrap) return;
+    wrap.querySelectorAll('.jam-bar.loop').forEach(e => e.remove());
+    _passMark(0);
+    const n = S.bars.length;
+    if (!n || S.autoScroll === false) return;
+    const cols = getComputedStyle(wrap).gridTemplateColumns.split(' ').filter(Boolean).length;
+    if (cols < 2) return;
+    /* rows in view: the last real row can scroll to the top with a full
+       view of loop rows under it */
+    const box = wrap.parentElement, first = wrap.firstElementChild;
+    const rowH = first ? first.getBoundingClientRect().height + (parseFloat(getComputedStyle(wrap).rowGap) || 0) : 0;
+    const vis = rowH > 0 && box ? Math.max(1, Math.ceil(box.clientHeight / rowH)) : 1;
+    const fill = (cols - n % cols) % cols + cols * Math.min(8, vis - 1);
+    const reals = wrap.children;
+    for (let k = 0; k < fill; k++){
+      const of = k % n, src = reals[of];
+      if (!src) break;
+      const d = src.cloneNode(true);
+      d.classList.add('loop'); d.classList.remove('playing', 'editing', 'dim');
+      d.dataset.of = of; d.dataset.pass = _nextPass(wrap.lastElementChild, of);
+      d.title = `loop · bar ${of + 1} again\n` + (src.title || '');
+      wrap.appendChild(d);
+    }
+    _passMark(0);
+  }
+  /* v0.0.32 · which time round a card belongs to: the song's own cards are
+     round 0, and each loop card that starts again at bar 1 opens a new one */
+  function _passOf(e){ return e && e.dataset && e.dataset.pass !== undefined ? +e.dataset.pass : 0 }
+  function _nextPass(prev, of){ return _passOf(prev) + (of === 0 ? 1 : 0) }
+  function _passMark(cur){
+    const wrap = document.getElementById('jamBars'); if (!wrap) return;
+    for (const c of wrap.children) if (c.classList && c.classList.contains('jam-bar')) c.classList.toggle('dim', _passOf(c) !== cur);
+  }
+  /* which bar a card shows: the real cards come first, in order */
+  function _barOf(e){
+    if (!e || !e.classList || !e.classList.contains('jam-bar')) return -1;
+    if (e.classList.contains('loop')) return +e.dataset.of;
+    return Array.prototype.indexOf.call(e.parentNode.children, e);
+  }
+  /* keep a view of loop cards ahead of the lit one, and drop whole rows
+     of old loop cards far above it (whole rows, so nothing reflows) */
+  function _loopAhead(el){
+    const wrap = el.parentNode, n = S.bars.length;
+    if (!n) return;
+    const box = wrap.parentElement;
+    const cols = getComputedStyle(wrap).gridTemplateColumns.split(' ').filter(Boolean).length || 1;
+    const rowH = el.getBoundingClientRect().height + (parseFloat(getComputedStyle(wrap).rowGap) || 0);
+    const vis = rowH > 0 && box ? Math.max(1, Math.ceil(box.clientHeight / rowH)) : 1;
+    let pos = Array.prototype.indexOf.call(wrap.children, el);
+    // ahead: at least the rest of this row and `vis` more rows
+    const want = pos + 1 + (cols - 1 - pos % cols) + cols * vis;
+    while (wrap.children.length < want){
+      const last = wrap.lastElementChild, of = (_barOf(last) + 1) % n, src = wrap.children[of];
+      if (!src) break;
+      const d = src.cloneNode(true);
+      d.classList.add('loop'); d.classList.remove('playing', 'editing', 'dim');
+      d.dataset.of = of; d.dataset.pass = _nextPass(last, of);
+      d.title = `loop · bar ${of + 1} again\n` + (src.title || '');
+      wrap.appendChild(d);
+    }
+    // behind: once more than a song's worth of loop rows sit above the lit
+    // row, remove them; the scroll moves up by the same rows
+    const rowStart = pos - pos % cols;
+    const m = Math.floor((rowStart - n) / cols) * cols;
+    if (m >= Math.max(n, cols * 2)){
+      const before = el.getBoundingClientRect().top;
+      for (let k = 0; k < m; k++){ const x = wrap.children[n]; if (x && x.classList.contains('loop')) x.remove(); }
+      if (box) box.scrollTop += el.getBoundingClientRect().top - before;
+    }
+  }
+  let _loopRO = null, _loopCols = '';
+  function _loopKey(){
+    const wrap = document.getElementById('jamBars'); if (!wrap) return '';
+    const box = wrap.parentElement, first = wrap.firstElementChild;
+    const c = getComputedStyle(wrap).gridTemplateColumns.split(' ').filter(Boolean).length;
+    const rh = first ? Math.round(first.getBoundingClientRect().height) : 0;
+    return c + 'x' + rh + 'x' + (box ? box.clientHeight : 0);
+  }
+  function _watchLoop(){
+    const wrap = document.getElementById('jamBars');
+    if (_loopRO || !wrap || typeof ResizeObserver === 'undefined') return;
+    _loopRO = new ResizeObserver(() => {
+      const k = _loopKey();
+      if (k !== _loopCols){ _loopCols = k; _fillLoop(); }
+    });
+    _loopRO.observe(wrap);
+    if (wrap.parentElement) _loopRO.observe(wrap.parentElement);
+  }
+
   function _renderBars(){
     const wrap = document.getElementById('jamBars');
     if (!wrap) return;
@@ -9943,6 +10225,9 @@ const Jam = (() => {
     // A 32-bar AABA or a 60-bar pasted form then still reads at a glance.
     const dense = S.bars.length > 24;
     if (box) box.classList.toggle('dense', dense);
+    /* v0.0.27: card size. 100 % is the size it always was. */
+    const Z = S.zoom || 1;
+    if (box) box.style.setProperty('--jb-cell', Math.round((dense ? 112 : 144) * Z) + 'px');
 
     let longest = 1, longestPitch = 1;
     S.bars.forEach((bar, i) => {
@@ -9958,7 +10243,7 @@ const Jam = (() => {
                     `<span class="jb-c">${names}</span>` +
                     `<span class="jb-p">${pitch}</span>`;
       d.title = bar.map(c => `${c.label} = ${c.name}  ·  ${c.notes.join(' ')}`)
-                   .join('\n');
+                   .join('\n') + '\n(double-click to change)';
       wrap.appendChild(d);
     });
 
@@ -9967,7 +10252,7 @@ const Jam = (() => {
     // "C" or "Am" and far too wide for "F#m7b5" or a split bar like "C G".
     // One size is chosen for the WHOLE strip from the longest name in it, so
     // the tiles stay a uniform grid rather than a ransom note.
-    const BASE = dense ? 52 : 90;
+    const BASE = (dense ? 52 : 90) * Z;
     const want = longest <= 2 ? BASE
                : longest === 3 ? BASE * 0.72
                : longest === 4 ? BASE * 0.56
@@ -9986,8 +10271,8 @@ const Jam = (() => {
     // Both are measured against the tile that actually got laid out rather
     // than the minimum it was declared with.
     const first = wrap.firstElementChild;
-    const cell = (first && first.getBoundingClientRect().width) || (dense ? 112 : 144);
-    const ppx = Math.max(14, Math.min(dense ? 20 : 24,
+    const cell = (first && first.getBoundingClientRect().width) || (dense ? 112 : 144) * Z;
+    const ppx = Math.max(14, Math.min(Math.round((dense ? 20 : 24) * Z),
                   Math.floor((cell - 10) / (longestPitch * 0.62))));
     // 10 = 2px border + 8px padding, 20 = the index line, 4 = the two gaps
     const room = cell - 10 - 20 - ppx - 4;
@@ -9996,6 +10281,33 @@ const Jam = (() => {
       box.style.setProperty('--jb-text', px + 'px');
       box.style.setProperty('--jb-pitch', ppx + 'px');
     }
+
+    // ---- v0.0.24 · cards view: one fixed square per tile, and every tile
+    // fits ITS OWN chord and notes rather than the longest in the strip,
+    // so "Am" fills its tile while "Bm F#m" is sized to fit its own.
+    if (box && box.closest('#cvBody')){
+      const GAP = 3, MIN = Math.round((dense ? 150 : 210) * Z);
+      const W = wrap.clientWidth;
+      const cols = Math.max(1, Math.floor((W + GAP) / (MIN + GAP)));
+      const c = Math.max(60, Math.floor((W - GAP * (cols - 1)) / cols));
+      box.style.setProperty('--cv-cell', c + 'px');
+      const PH = Math.max(12, Math.round(c * 0.15));
+      box.style.setProperty('--cv-ph', PH + 'px');
+      box.style.setProperty('--cv-ch', Math.min(Math.floor(c - 10 - 20 - PH - 4), Math.round(c * 0.36 * 1.1)) + 'px');
+      for (const d of wrap.children){
+        const cEl = d.querySelector('.jb-c'), pEl = d.querySelector('.jb-p');
+        if (!cEl || !pEl) continue;
+        const cl = Math.max(1, cEl.textContent.length), pl = Math.max(1, pEl.textContent.length);
+        // monospace: a glyph is ~0.62 em wide
+        const p = Math.max(7, Math.min(Math.round(c * 0.15), Math.floor((c - 10) / (pl * 0.62))));
+        const roomC = c - 10 - 20 - p - 4;
+        const cpx = Math.max(16, Math.min(Math.round(c * 0.36), Math.floor((c - 10) / (cl * 0.62)), Math.floor(roomC / 1.05)));
+        d.style.setProperty('--cv-p', p + 'px');
+        d.style.setProperty('--cv-c', cpx + 'px');
+      }
+    } else if (box) ['--cv-cell', '--cv-ph', '--cv-ch'].forEach(k => box.style.removeProperty(k));
+    _fillLoop(); _watchLoop();
+    _loopCols = _loopKey();
   }
 
 
@@ -10057,7 +10369,7 @@ const Jam = (() => {
     S.raw = raw;
     { const tS = document.getElementById('jamTemplate');
       const tt = TEMPLATES.find(x => x.id === (tS && tS.value));
-      S.odd = (tt && tt.odd && tt.prog === raw) ? tt.odd : null; }
+      S.odd = (tt && tt.odd && (tt.prog === raw || _cardKept(tt, raw))) ? tt.odd : null; }
     _layout();
     S.active = true;
     S.step = 0;
@@ -10326,6 +10638,7 @@ const Jam = (() => {
     tSel.addEventListener('change', e => {
       const t = TEMPLATES.find(x => x.id === e.target.value);
       if (!t || !t.id) return;
+      S.cardEdit = null;
       document.getElementById('jamInput').value = t.prog;
       document.getElementById('jamKey').value = t.key;
       document.getElementById('jamStyle').value = t.style;
@@ -10372,7 +10685,70 @@ const Jam = (() => {
     // typing a custom progression means it's no longer "the template"
     document.getElementById('jamInput').addEventListener('input', () => {
       const t = TEMPLATES.find(x => x.id === tSel.value);
+      S.cardEdit = null;
       if (t && t.id && t.prog !== document.getElementById('jamInput').value) tSel.value = '';
+    });
+    /* v0.0.27: auto-scroll and card size — one setting each, shown in
+       [01] and in ▦ cards. Remembered in this browser. */
+    S.autoScroll = true; S.zoom = 1;
+    try {
+      if (localStorage.getItem('bandlite.autoscroll') === 'off') S.autoScroll = false;
+      const z = parseFloat(localStorage.getItem('bandlite.zoom'));
+      if (z >= 0.4 && z <= 3) S.zoom = z;
+    } catch (_){}
+    const _scrollUI = () => document.querySelectorAll('[data-autoscroll]').forEach(b => {
+      b.classList.toggle('active', S.autoScroll);
+      b.textContent = S.autoScroll ? '⇣ scroll' : '· scroll';
+    });
+    const _zoomUI = () => document.querySelectorAll('[data-zoom]').forEach(i => {
+      if (i.readOnly) i.value = Math.round(S.zoom * 100) + ' %';
+    });
+    const _setZoom = pct => {
+      const v = Math.max(40, Math.min(300, Math.round(+pct)));
+      if (!isFinite(v)) return;
+      S.zoom = v / 100;
+      try { localStorage.setItem('bandlite.zoom', String(S.zoom)); } catch (_){}
+      _zoomUI();
+      _renderBars(); if (S.lastBarShown >= 0) _lightBar(S.lastBarShown);
+    };
+    document.querySelectorAll('[data-autoscroll]').forEach(b => b.addEventListener('click', () => {
+      S.autoScroll = !S.autoScroll;
+      try { localStorage.setItem('bandlite.autoscroll', S.autoScroll ? 'on' : 'off'); } catch (_){}
+      _scrollUI();
+      _fillLoop();
+      if (S.autoScroll && S.lastBarShown >= 0) _lightBar(S.lastBarShown);
+    }));
+    document.querySelectorAll('[data-zoom-pick]').forEach(s => s.addEventListener('change', () => {
+      if (s.value) _setZoom(s.value);
+      s.value = '';
+    }));
+    document.querySelectorAll('[data-zoom]').forEach(inp => {
+      let before = '';
+      inp.addEventListener('dblclick', () => {
+        before = inp.value; inp.readOnly = false;
+        inp.value = String(Math.round(S.zoom * 100)); inp.focus(); inp.select();
+      });
+      const done = ok => {
+        if (inp.readOnly) return;
+        const v = parseFloat(inp.value);
+        inp.readOnly = true;
+        if (ok && isFinite(v)) _setZoom(v); else inp.value = before;
+        _zoomUI();
+      };
+      inp.addEventListener('keydown', e => {
+        if (inp.readOnly) return;
+        e.stopPropagation();
+        if (e.key === 'Enter'){ e.preventDefault(); done(true); inp.blur(); }
+        else if (e.key === 'Escape'){ e.preventDefault(); done(false); inp.blur(); }
+      });
+      inp.addEventListener('blur', () => done(true));
+    });
+    _scrollUI(); _zoomUI();
+
+    /* v0.0.25: double-click a card to change its chord */
+    document.getElementById('jamBars').addEventListener('dblclick', e => {
+      const card = e.target.closest('.jam-bar');
+      if (card && !e.target.closest('.jb-edit')) _cardEdit(card);
     });
 
     document.getElementById('jamSyncLoop').addEventListener('click', () => {
